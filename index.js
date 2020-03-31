@@ -6,35 +6,56 @@ const PdfDocument = require('pdfkit');
 
 (async () => {
 
-
     const directory = 'shots/';
+    let slidesCounter = 0;
+    let width;
+    let height;
 
-    // await cleanDirectory(directory);
-    // const browser = await puppeteer.launch({
-    //     // headless: false
-    // });
-    // const page = await browser.newPage();
-    // const parentSlector = 'div.ndfHFb-c4YZDc-cYSp0e-DARUcf';
-    // const selector = 'div.ndfHFb-c4YZDc-cYSp0e-DARUcf-PLDbbf';
-    //
-    // await page.setViewport({
-    //     width: 1920,
-    //     height: 800
-    // });
-    //
-    // await page.goto('https://drive.google.com/file/d/1jJ-GPgDullepWlKXK9XYKmODxsCtxOAV/view');
-    //
-    // await scrollToBottom(page);
-    // browser.close();
+
+
+    const link = 'https://drive.google.com/open?id=1o3XmvhBihZFAvrLTm2PnUjd30tk789NP';
+
+    const parentSlector = 'div.ndfHFb-c4YZDc-cYSp0e-DARUcf';
+    const selector = 'div.ndfHFb-c4YZDc-cYSp0e-DARUcf-PLDbbf';
+
+
+    // run program
+    await fs.promises.mkdir(directory, {recursive: true})
+
+    await cleanDirectory(directory);
+    const browser = await puppeteer.launch({
+        headless: true
+    });
+
+    const page = await browser.newPage();
+
+    const pageHeight = {
+        horizontal: 900,
+        vertical: 1400
+    }
+
+    await page.setViewport({
+        width: 1920,
+        height: pageHeight.vertical
+    });
+
+    await page.goto(link);
+
+    const title = (await page.title()).split('.')[0];
+
+    await analyzePage(page);
+
+    browser.close();
 
     await createPDF();
 
-    async function scrollToBottom(page) {
+    async function analyzePage(page) {
         const delay = 1000;
 
         const slides = await page.evaluate(selector => {
             const element = document.querySelectorAll(selector);
             const recArray = [];
+            slidesCounter = element.length;
 
             if (!element)
                 return null;
@@ -45,43 +66,43 @@ const PdfDocument = require('pdfkit');
             }
 
             return recArray;
-        }, selector);
+        }, selector, title);
 
 
         let iterator = 0;
 
         do {
+
+            const params = {
+                x: slides[0].x,
+                y: (iterator === slides.length - 1) ? (pageHeight - slides[iterator].height - 56) : slides[0].y,
+                width: slides[iterator].width,
+                height: slides[iterator].height
+            };
+
             await page.waitFor(delay);
 
-            await screenshot({
-                x: slides[0].x,
-                y: slides[0].y,
-                width: 800,
-                height: 600
-            }, iterator);
+            await takeScreenshot(params, iterator);
 
-            await page.evaluate((y) => {
+            await page.evaluate(height => {
                 const container = document.querySelector('.ndfHFb-c4YZDc-cYSp0e-s2gQvd');
-                container.scrollBy(0, 600 + 16);
-            }, slides[iterator].y);
+                container.scrollBy(0, height + 16);
+            }, slides[iterator].height);
 
             iterator++;
-
-            console.clear();
             console.log(iterator);
 
         } while (slides[iterator - 1] !== slides[slides.length - 1]);
+
+        slidesCounter = iterator;
+        width = slides[0].width;
+        height = slides[0].height;
     }
 
-    async function screenshot({x, y, width, height}, i) {
+    async function takeScreenshot(clip, i) {
         await page.screenshot({
             path: directory + `slide-${i}.png`,
-            clip: {
-                x,
-                y,
-                width,
-                height
-            }
+            clip
         });
     }
 
@@ -90,20 +111,18 @@ const PdfDocument = require('pdfkit');
             autoFirstPage: false
         });
 
+        doc.pipe(fs.createWriteStream(`${__dirname}/${title}.pdf`));
 
-        doc.pipe(fs.createWriteStream(__dirname + '/Prezentacja.pdf'));
-
-        for (let i = 0; i < 89; i++) {
+        for (let i = 0; i < slidesCounter; i++) {
             doc.addPage({
-                layout: "landscape",
-                margin: 0
-            }).image(`${directory}slide-${i}.png`, {
-                // fit: [600, 800],
-                align: "center",
-                valign: "center"
-            })
+                margin: 0,
+                size: [width, height]
+            }).image(`${directory}slide-${i}.png`,
+                {
+                    align: "center",
+                    valign: "center",
+                })
         }
-
         doc.end();
     }
 
