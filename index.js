@@ -10,13 +10,16 @@ const PdfDocument = require('pdfkit');
     let slidesCounter = 0;
     let width;
     let height;
-
-
-
-    const link = 'https://drive.google.com/open?id=1o3XmvhBihZFAvrLTm2PnUjd30tk789NP';
-
     const parentSlector = 'div.ndfHFb-c4YZDc-cYSp0e-DARUcf';
     const selector = 'div.ndfHFb-c4YZDc-cYSp0e-DARUcf-PLDbbf';
+    let viewportHeight = {
+        horizontal: 900,
+        vertical: 1400
+    }
+
+    // config
+    viewportHeight = viewportHeight.horizontal;
+    const link = 'https://drive.google.com/file/d/1iuv0MwBWUJrVQvUOPUWVtL8CG9MEU894/view';
 
 
     // run program
@@ -29,19 +32,15 @@ const PdfDocument = require('pdfkit');
 
     const page = await browser.newPage();
 
-    const pageHeight = {
-        horizontal: 900,
-        vertical: 1400
-    }
 
     await page.setViewport({
         width: 1920,
-        height: pageHeight.vertical
+        height: viewportHeight
     });
 
     await page.goto(link);
 
-    const title = (await page.title()).split('.')[0];
+    const title = (await page.title()).split('.')[0] || 'Presentation';
 
     await analyzePage(page);
 
@@ -75,7 +74,7 @@ const PdfDocument = require('pdfkit');
 
             const params = {
                 x: slides[0].x,
-                y: (iterator === slides.length - 1) ? (pageHeight - slides[iterator].height - 56) : slides[0].y,
+                y: (iterator === slides.length - 1) ? (viewportHeight - slides[iterator].height - 56) : slides[0].y,
                 width: slides[iterator].width,
                 height: slides[iterator].height
             };
